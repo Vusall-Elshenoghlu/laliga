@@ -1,11 +1,13 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { HandsBack, HandsFront } from '../components/game/Hands'
+import Controller, { loadPadColor } from '../components/game/Controller'
 import { prefersReducedMotion } from '../lib/smooth'
 import gsap from 'gsap'
 import ScrollSequence from '../components/ScrollSequence'
 import DiscShelf from '../components/game/DiscShelf'
 import Branches from '../components/Branches'
-import { gameBranches } from '../data/branches'
+import SmartImg, { BRAND } from '../components/SmartImg'
+import TeamSection from '../components/team/TeamSection'
 import { useGo } from '../lib/transition'
 import { useReserve } from '../components/Reserve'
 import { useI18n } from '../lib/i18n'
@@ -18,7 +20,9 @@ export default function GameCenter() {
   const { t } = useI18n()
   const reserve = useReserve()
   const rail = useRef<HTMLDivElement>(null)
+  const cue = useRef<HTMLDivElement>(null)
   const page = useRef<HTMLDivElement>(null)
+  const [padColor] = useState(loadPadColor)
 
   useLayoutEffect(() => {
     if (!page.current) return
@@ -28,13 +32,13 @@ export default function GameCenter() {
         gsap.from(el, { scrollTrigger: { trigger: el, start: 'top 85%' }, y: 40, opacity: 0, duration: 0.9, delay: i * 0.08, ease: 'power3.out' })
       })
       // hands wait below the controller until "Pick up the controller" is pressed
-      gsap.set('.hall-teaser .hand-move--left', { x: -260, y: 760, rotate: -16, opacity: 0, transformOrigin: '50% 100%' })
-      gsap.set('.hall-teaser .hand-move--right', { x: 260, y: 760, rotate: 16, opacity: 0, transformOrigin: '50% 100%' })
-      gsap.set('.hall-teaser .hand-thumb', { rotate: 38, transformOrigin: '88% 92%' })
-      gsap.set('.hall-teaser .hand-fingers', { x: 60, opacity: 0 })
+      // both layers (hand behind, thumb on top) of a side get identical transforms, so they stay glued
+      gsap.set('.hall-teaser .hand-move--left', { xPercent: -14, yPercent: 48, rotate: -10, opacity: 0, transformOrigin: '55% 95%' })
+      gsap.set('.hall-teaser .hand-move--right', { xPercent: 14, yPercent: 48, rotate: 10, opacity: 0, transformOrigin: '45% 95%' })
+      gsap.set('.hall-teaser .hands--front', { opacity: 0 })
       gsap.from('.hall-teaser__wrap', {
         scrollTrigger: { trigger: '.hall-teaser', start: 'top bottom', end: 'bottom top', scrub: true },
-        yPercent: 18, rotate: -4, ease: 'none',
+        yPercent: 6, rotate: -2, ease: 'none',
       })
     }, page)
     return () => ctx.revert()
@@ -52,13 +56,17 @@ export default function GameCenter() {
     const q = (sel: string) => page.current!.querySelectorAll(`.hall-teaser ${sel}`)
     gsap.timeline({ onComplete: () => { go('/game-center/hall'); window.setTimeout(() => { grabbing.current = false }, 1500) } })
       .to(q('.hall-teaser__copy'), { opacity: 0, x: -40, duration: 0.5, ease: 'power2.in' }, 0)
-      // hands reach in from below
-      .to(q('.hand-move--left, .hand-move--right'), { x: 0, y: 0, rotate: 0, opacity: 1, duration: 0.85, ease: 'expo.out', stagger: 0.07 }, 0.05)
-      // fingers wrap the grips, thumbs come onto the face
-      .to(q('.hand-fingers'), { x: 0, opacity: 1, duration: 0.3, ease: 'back.out(2)' }, 0.7)
-      .to(q('.hand-thumb'), { rotate: 0, duration: 0.35, ease: 'back.out(1.8)', stagger: 0.05 }, 0.72)
+      // hands reach in from below, opening slightly wider than the grips…
+      // (the copy behind the controller is the one you see now — hands rise from behind the grips)
+      .to(q('.hand-move--left'), { xPercent: -6, yPercent: 8, rotate: -4, opacity: 1, duration: 0.75, ease: 'power3.out' }, 0.05)
+      .to(q('.hand-move--right'), { xPercent: 6, yPercent: 8, rotate: 4, opacity: 1, duration: 0.75, ease: 'power3.out' }, 0.1)
+      // …then close round the grips: thumbs and fingers come over the controller
+      .to(q('.hand-move--left, .hand-move--right'), { xPercent: 0, yPercent: 0, rotate: 0, duration: 0.42, ease: 'power3.inOut' }, 0.72)
+      .to(q('.hands--front'), { opacity: 1, duration: 0.28, ease: 'power1.inOut' }, 0.8)
+      // a small squeeze as they take the weight
+      .to(lift, { y: 6, scale: 0.995, duration: 0.12, ease: 'power2.out', yoyo: true, repeat: 1 }, 1.0)
       // and lift it up towards the viewer, into the centre of the screen
-      .to(lift, { x: dx, y: dy, scale: 1.25, rotate: -2, duration: 1, ease: 'expo.inOut' }, 1.05)
+      .to(lift, { x: dx, y: dy, scale: 1.12, rotate: -2, duration: 1, ease: 'expo.inOut' }, 1.05)
       .to(lift, { rotate: 0, duration: 0.3, ease: 'sine.inOut' }, 1.85)
   }
 
@@ -69,7 +77,10 @@ export default function GameCenter() {
         frameCount={FRAMES}
         frameSrc={frame}
         lengthVh={560}
-        onProgress={(p) => rail.current?.style.setProperty('--p', String(p))}
+        onProgress={(p) => {
+          rail.current?.style.setProperty('--p', String(p))
+          cue.current?.style.setProperty('--p', String(p))
+        }}
         timeline={(tl) => {
           tl.to('.gc-hero__intro', { opacity: 0, y: -60, duration: 0.12, ease: 'power2.in' }, 0.08)
             .fromTo('.gc-hero__beat--1', { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.06 }, 0.24)
@@ -79,6 +90,10 @@ export default function GameCenter() {
             .fromTo('.gc-hero__beat--3', { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.06 }, 0.8)
             .to('.gc-hero__beat--3', { opacity: 0, y: -30, duration: 0.05 }, 0.93)
             .to('.gc-hero__veil', { opacity: 1, duration: 0.05 }, 0.95)
+            // the scroll cue stays until the disc is out of its case, then hands over to the shelf
+            .to('.gc-cue__label--start', { opacity: 0, y: -10, duration: 0.04 }, 0.1)
+            .fromTo('.gc-cue__label--go', { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.04 }, 0.12)
+            .to('.gc-cue', { opacity: 0, y: 20, duration: 0.05 }, 0.9)
         }}
       >
         <div className="gc-hero__veil" aria-hidden="true" />
@@ -91,7 +106,23 @@ export default function GameCenter() {
             <p>{t('gc.sub')}</p>
             <button className="btn btn--solid" onClick={() => reserve('game')}>{t('gc.bookStation')}</button>
           </div>
-          <span className="gc-hero__hint" aria-hidden="true">{t('gc.hint')}</span>
+        </div>
+        <div ref={cue} className="gc-cue" aria-hidden="true">
+          <span className="gc-cue__case">
+            <span className="gc-cue__cd"><i /></span>
+            <span className="gc-cue__box">
+              <span className="gc-cue__band">PS5</span>
+              <span className="gc-cue__art" />
+              <span className="gc-cue__glare" />
+            </span>
+          </span>
+          <span className="gc-cue__text">
+            <span className="gc-cue__label gc-cue__label--start">{t('gc.hint')}</span>
+            <span className="gc-cue__label gc-cue__label--go">{t('gc.hintGo')}</span>
+            <span className="gc-cue__bar"><b /></span>
+          </span>
+          <span className="gc-cue__disc" />
+          <span className="gc-cue__chev"><i /><i /><i /></span>
         </div>
         <p className="gc-hero__beat gc-hero__beat--1">{t('gc.beat1')}</p>
         <p className="gc-hero__beat gc-hero__beat--2">{t('gc.beat2')}</p>
@@ -101,7 +132,7 @@ export default function GameCenter() {
 
       <DiscShelf />
 
-      <section className="hall-teaser" aria-labelledby="hall-teaser-title">
+      <section className="hall-teaser" id="game-hall" aria-labelledby="hall-teaser-title">
         <div className="hall-teaser__copy">
           <h2 id="hall-teaser-title">Game Hall</h2>
           <p>{t('gc.hallText')}</p>
@@ -113,7 +144,16 @@ export default function GameCenter() {
           <div className="hall-teaser__lift" onClick={grab}>
             <div className="hall-teaser__rig">
               <HandsBack />
-              <img className="hall-teaser__console" src="/media/game/console.webp" alt={t('gc.hallAlt')} loading="lazy" />
+              <Controller className="hall-teaser__console" color={padColor} alt={t('gc.hallAlt')} />
+              {/* the controller's screen shows the same LaLiga boot screen as the Game Hall */}
+              <div className="hall-teaser__ui" aria-hidden="true">
+                <div className="hall__boot">
+                  <SmartImg src={BRAND.emblem} fallbacks={[BRAND.emblemRemote, BRAND.emblemSvg]} alt="" />
+                  <span>LALIGA</span>
+                  <i className="hall-teaser__bar" />
+                </div>
+              </div>
+              <div className="hall-teaser__name" aria-hidden="true">LaLiga</div>
               <HandsFront />
             </div>
           </div>
@@ -136,7 +176,9 @@ export default function GameCenter() {
         </dl>
       </section>
 
-      <Branches id="filiallar" title={t('gc.branchesTitle'    )} venue="game" branches={gameBranches} />
+      <Branches id="filiallar" title={t('gc.branchesTitle')} venue="game" />
+
+      <TeamSection venue="game" />
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLenis } from '../lib/smooth'
 import { useLocation } from 'react-router-dom'
@@ -14,20 +14,25 @@ const LINKS: Record<Mode, Link[]> = {
   home: [
     { label: 'Game Center', to: '/game-center' },
     { label: 'Dining & Lounge', to: '/dining' },
-    { label: 'nav.loyalty', to: '/#loyalty' },
-    { label: 'nav.contact', to: '/#elaqe' },
+    { label: 'nav.team', to: '/komanda' },
+    { label: 'nav.careers', to: '/karyera' },
+    { label: 'nav.contact', to: '/elaqe' },
   ],
   game: [
+    { label: 'Game Center', to: '/game-center' },
     { label: 'nav.shelf', to: '/game-center#oyunlar' },
-    { label: 'Game Hall', to: '/game-center/hall' },
+    { label: 'Game Hall', to: '/game-center#game-hall' },
     { label: 'nav.how', to: '/game-center#nece' },
     { label: 'nav.branches', to: '/game-center#filiallar' },
+    { label: 'nav.team', to: '/game-center#komanda' },
   ],
   dining: [
-    { label: 'nav.menu', to: '/dining/menu' },
+    { label: 'Dining & Lounge', to: '/dining' },
     { label: 'nav.rooms', to: '/dining#otaqlar' },
+    { label: 'nav.menu', to: '/dining#menyu' },
     { label: 'nav.picks', to: '/dining#secilmis' },
     { label: 'nav.branches', to: '/dining#filiallar' },
+    { label: 'nav.team', to: '/dining#komanda' },
   ],
 }
 
@@ -81,19 +86,89 @@ export default function Navbar() {
     go(to)
   }
 
-  const isActive = (to: string) => !to.includes('#') && to === pathname
+  /* ---------- active link: by page, and by section while scrolling (scroll-spy) ---------- */
+  const [spy, setSpy] = useState<string | null>(null)
+  useEffect(() => {
+    setSpy(null)
+    const sections = LINKS[mode]
+      .filter((l) => l.to.includes('#') && l.to.split('#')[0] === pathname)
+      .map((l) => ({ to: l.to, id: l.to.split('#')[1] }))
+    if (!sections.length) return
+    let raf = 0
+    const check = () => {
+      raf = 0
+      const line = window.innerHeight * 0.42
+      let cur: string | null = null
+      for (const s of sections) {
+        const el = document.getElementById(s.id)
+        if (!el) continue
+        const r = el.getBoundingClientRect()
+        if (r.top <= line && r.bottom > line) cur = s.to
+      }
+      setSpy((p) => (p === cur ? p : cur))
+    }
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(check) }
+    const t = window.setTimeout(check, 400) // sections mount after the route change
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    return () => { window.clearTimeout(t); cancelAnimationFrame(raf); window.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onScroll) }
+  }, [mode, pathname])
+
+  const isActive = (to: string) => {
+    if (to.includes('#')) {
+      if (spy === to) return true
+      // sub-pages that belong to a section
+      if (to === '/game-center#game-hall' && pathname === '/game-center/hall') return true
+      if (to.endsWith('#filiallar') && pathname.startsWith(to.split('#')[0] + '/filiallar/')) return true
+      if (to === '/dining#menyu' && pathname === '/dining/menu') return true
+      return false
+    }
+    // the world link (Game Center / Dining & Lounge) stays active on its page until a section takes over
+    return (to === pathname || (to === '/komanda' && pathname.startsWith('/komanda/'))) && !spy
+  }
+  const activeTo = LINKS[mode].find((l) => isActive(l.to))?.to ?? null
+
+  // the sliding pill under the active link
+  const linksRef = useRef<HTMLElement>(null)
+  const [pill, setPill] = useState<{ x: number; w: number } | null>(null)
+  useLayoutEffect(() => {
+    const place = () => {
+      const box = linksRef.current
+      const a = box?.querySelector<HTMLElement>(`a[data-to="${activeTo}"]`)
+      setPill(a ? { x: a.offsetLeft, w: a.offsetWidth } : null)
+    }
+    place()
+    window.addEventListener('resize', place)
+    document.fonts?.ready.then(place)
+    return () => window.removeEventListener('resize', place)
+  }, [activeTo, lang, mode])
 
   return (
     <header className={`nav ${scrolled ? 'is-scrolled' : ''} ${menuOpen ? 'is-menu-open' : ''}`} data-mode={mode}>
       <a href="/" className="nav__brand" onClick={(e) => { e.preventDefault(); nav('/') }} aria-label={t('nav.home')}>
-        <SmartImg className="nav__emblem" src={BRAND.emblem} fallbacks={[BRAND.emblemRemote, BRAND.emblemSvg]} alt="" />
-        <SmartImg className="nav__wordmark" src={BRAND.wordmark} fallbacks={[BRAND.wordmarkRemote]} alt="LaLiga" onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')} />
-        {mode !== 'home' && <span className="nav__world">{mode === 'game' ? 'Game Center' : 'Dining & Lounge'}</span>}
+        {mode === 'home' ? (
+          <>
+            <SmartImg className="nav__emblem" src={BRAND.emblem} fallbacks={[BRAND.emblemRemote, BRAND.emblemSvg]} alt="" />
+            <SmartImg className="nav__wordmark" src={BRAND.wordmark} fallbacks={[BRAND.wordmarkRemote]} alt="LaLiga" onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')} />
+          </>
+        ) : (
+          <img
+            key={mode}
+            className={`nav__logo nav__logo--${mode}`}
+            src={mode === 'game' ? '/media/brand/logo-gc.webp' : '/media/brand/logo-dining.webp'}
+            alt={mode === 'game' ? 'LaLiga Game Center' : 'LaLiga Dining & Lounge'}
+          />
+        )}
       </a>
 
-      <nav className="nav__links" aria-label={t('nav.main')}>
+      <nav ref={linksRef} className="nav__links" aria-label={t('nav.main')}>
+        <span
+          className={`nav__pill ${pill ? 'is-on' : ''}`}
+          style={pill ? { transform: `translateX(${pill.x}px)`, width: pill.w } : undefined}
+          aria-hidden="true"
+        />
         {LINKS[mode].map((l) => (
-          <a key={l.to} href={l.to} aria-current={isActive(l.to) ? 'page' : undefined} onClick={(e) => { e.preventDefault(); nav(l.to) }}>
+          <a key={l.to} href={l.to} data-to={l.to} aria-current={isActive(l.to) ? (l.to.includes('#') ? 'location' : 'page') : undefined} onClick={(e) => { e.preventDefault(); nav(l.to) }}>
             {label(l)}
           </a>
         ))}
@@ -103,11 +178,18 @@ export default function Navbar() {
         {mode !== 'home' && (
           <a
             href={mode === 'game' ? '/dining' : '/game-center'}
-            className="nav__switch"
+            className={`nav__swap nav__swap--${mode === 'game' ? 'dining' : 'game'}`}
             onClick={(e) => { e.preventDefault(); nav(mode === 'game' ? '/dining' : '/game-center') }}
+            aria-label={`${t('nav.goTo')}: ${mode === 'game' ? 'Dining & Lounge' : 'Game Center'}`}
           >
-            <span className="nav__switch-dot" aria-hidden="true" />
-            {mode === 'game' ? 'Dining & Lounge' : 'Game Center'}
+            <span className="nav__swap-label" aria-hidden="true">
+              <small>{t('nav.goTo')}</small>
+              {mode === 'game' ? 'Dining & Lounge' : 'Game Center'}
+            </span>
+            <span className="nav__swap-ico" aria-hidden="true">
+              {/* the other world's own emblem: gold d-pad = Dining, grey d-pad = Game Center */}
+              <img src={mode === 'game' ? '/media/brand/emblem-dining.webp' : '/media/brand/emblem-gc.webp'} alt="" />
+            </span>
           </a>
         )}
         <div className="lang" role="group" aria-label={t('langLabel')}>
@@ -116,7 +198,7 @@ export default function Navbar() {
           ))}
         </div>
         <button className="btn btn--solid nav__cta" onClick={() => reserve(mode === 'dining' ? 'dining' : 'game')}>
-          {mode === 'dining' ? t('nav.bookTable') : t('nav.book')}
+          {mode === 'dining' ? t('nav.ctaTable') : t('nav.cta')}
         </button>
         <button className="nav__burger" aria-expanded={menuOpen} aria-controls="mobile-menu" aria-label={t('nav.openMenu')} onClick={() => setMenuOpen(!menuOpen)}>
           <span /><span />

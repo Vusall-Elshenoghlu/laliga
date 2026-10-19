@@ -7,6 +7,7 @@ import SmartImg, { BRAND } from '../components/SmartImg'
 import { useReserve } from '../components/Reserve'
 import BackButton from '../components/BackButton'
 import Arcade, { type ArcadeHandle, type ArcadeId, type PadBtn } from '../components/game/Arcade'
+import Controller, { PAD_COLORS, loadPadColor, padThumb, preloadPad, savePadColor, type ControllerHandle, type PadColor } from '../components/game/Controller'
 import { useI18n, type Key } from '../lib/i18n'
 import { prefersReducedMotion } from '../lib/smooth'
 
@@ -15,18 +16,18 @@ type Screen = 'boot' | 'browse' | 'list' | 'play' | 'arcade'
 
 /** Hotspot positions as % of the console image (2048×1152). */
 const HOT: Record<Btn, { x: number; y: number; d: number; label: Key | string; kind: string }> = {
-  up: { x: 13.25, y: 27.2, d: 3.7, label: 'hall.btn.up', kind: 'dpad dpad-up' },
-  down: { x: 13.25, y: 39.6, d: 3.7, label: 'hall.btn.down', kind: 'dpad dpad-down' },
-  left: { x: 9.6, y: 33.5, d: 4.6, label: 'hall.btn.left', kind: 'dpad dpad-left' },
-  right: { x: 16.9, y: 33.5, d: 4.6, label: 'hall.btn.right', kind: 'dpad dpad-right' },
-  triangle: { x: 87, y: 26.4, d: 4.3, label: '△', kind: 'face' },
-  square: { x: 82.75, y: 33.6, d: 4.3, label: '□', kind: 'face' },
-  circle: { x: 91.25, y: 33.6, d: 4.3, label: '○', kind: 'face' },
-  cross: { x: 87, y: 40.9, d: 4.3, label: '✕', kind: 'face' },
-  select: { x: 18.35, y: 19.1, d: 2.6, label: 'SELECT', kind: 'pill' },
-  start: { x: 82, y: 19.1, d: 2.6, label: 'START', kind: 'pill' },
-  ls: { x: 18.5, y: 60.4, d: 7.6, label: 'hall.btn.ls', kind: 'stick' },
-  rs: { x: 81.5, y: 60.4, d: 7.6, label: 'hall.btn.rs', kind: 'stick' },
+  up: { x: 13.28, y: 28.65, d: 3.5, label: 'hall.btn.up', kind: 'dpad dpad-up' },
+  down: { x: 13.28, y: 39.06, d: 3.5, label: 'hall.btn.down', kind: 'dpad dpad-down' },
+  left: { x: 10.25, y: 33.85, d: 4.3, label: 'hall.btn.left', kind: 'dpad dpad-left' },
+  right: { x: 16.36, y: 33.85, d: 4.3, label: 'hall.btn.right', kind: 'dpad dpad-right' },
+  triangle: { x: 86.33, y: 26.48, d: 3.9, label: '△', kind: 'face' },
+  square: { x: 82.03, y: 33.68, d: 3.9, label: '□', kind: 'face' },
+  circle: { x: 90.58, y: 33.68, d: 3.9, label: '○', kind: 'face' },
+  cross: { x: 86.33, y: 40.8, d: 3.9, label: '✕', kind: 'face' },
+  select: { x: 18.55, y: 22.6, d: 1.9, label: 'SELECT', kind: 'pill' },
+  start: { x: 81.45, y: 22.6, d: 1.9, label: 'START', kind: 'pill' },
+  ls: { x: 21.97, y: 47.74, d: 6.2, label: 'hall.btn.ls', kind: 'stick' },
+  rs: { x: 78.13, y: 47.74, d: 6.2, label: 'hall.btn.rs', kind: 'stick' },
 }
 
 const KEYMAP: Record<string, Btn> = {
@@ -43,13 +44,6 @@ const CARTS: { id: ArcadeId; key: Key; color: string }[] = [
 ]
 
 const COLS = 9
-
-function FaceSymbol({ b }: { b: Btn }) {
-  if (b === 'triangle') return <svg viewBox="0 0 24 24"><path d="M12 4 L21 19 H3 Z" fill="none" stroke="#2fb67c" strokeWidth="2.4" strokeLinejoin="round" /></svg>
-  if (b === 'circle') return <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="none" stroke="#ef4558" strokeWidth="2.4" /></svg>
-  if (b === 'cross') return <svg viewBox="0 0 24 24"><path d="M5.5 5.5 L18.5 18.5 M18.5 5.5 L5.5 18.5" stroke="#4f86f7" strokeWidth="2.4" strokeLinecap="round" /></svg>
-  return <svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1.5" fill="none" stroke="#e86bc6" strokeWidth="2.4" /></svg>
-}
 
 export default function GameHall() {
   const { games } = useGames()
@@ -69,6 +63,31 @@ function Hall({ games }: { games: Game[] }) {
   const page = useRef<HTMLDivElement>(null)
   const screenRef = useRef<HTMLDivElement>(null)
   const arcadeRef = useRef<ArcadeHandle>(null)
+  const padRef = useRef<ControllerHandle>(null)
+  const consoleRef = useRef<HTMLDivElement>(null)
+  const { lang } = useI18n()
+  const [color, setColor] = useState<PadColor>(loadPadColor)
+  const [picking, setPicking] = useState<string | null>(null)
+  const [dockOpen, setDockOpen] = useState(false)
+  useEffect(() => {
+    const id = window.setTimeout(() => PAD_COLORS.forEach((c) => preloadPad(c)), 2500)
+    return () => window.clearTimeout(id)
+  }, [])
+
+  const pickColor = (c: PadColor, e: React.MouseEvent) => {
+    if (c.id === (picking ?? color.id)) return
+    const pad = consoleRef.current?.querySelector('.pad')
+    let from = { x: 104, y: 108 }
+    if (pad) {
+      const r = pad.getBoundingClientRect()
+      const x = ((e.clientX - r.left) / r.width) * 100, y = ((e.clientY - r.top) / r.height) * 100
+      from = { x: Math.max(-8, Math.min(108, x)), y: Math.max(-8, Math.min(112, y)) }
+    }
+    setPicking(c.id)
+    savePadColor(c)
+    padRef.current?.paint(c, from)
+  }
+
   const game = games[idx]
   const label = (k: Key | string) => (k.includes('.') ? t(k as Key) : k)
 
@@ -177,8 +196,16 @@ function Hall({ games }: { games: Game[] }) {
 
       <div className="hall__stage">
         <div className="hall__rig">
-          <div className="hall__console">
-            <img className="hall__img" src="/media/game/console.webp" alt="" draggable={false} />
+          <div
+            ref={consoleRef}
+            className="hall__console"
+          >
+            <Controller
+              ref={padRef}
+              className="hall__img"
+              color={color}
+              onPainted={(c) => { setColor(c); setPicking((p) => (p === c.id ? null : p)) }}
+            />
             <span className="hall__led hall__led--l" aria-hidden="true" />
             <span className="hall__led hall__led--r" aria-hidden="true" />
 
@@ -261,7 +288,6 @@ function Hall({ games }: { games: Game[] }) {
 
             {(Object.keys(HOT) as Btn[]).map((b) => {
               const h = HOT[b]
-              const isFace = h.kind === 'face'
               return (
                 <button
                   key={b}
@@ -274,11 +300,40 @@ function Hall({ games }: { games: Game[] }) {
                   aria-label={label(h.label)}
                   title={label(h.label)}
                 >
-                  {isFace && <FaceSymbol b={b} />}
                 </button>
               )
             })}
           </div>
+        </div>
+      </div>
+
+      {/* controller colour */}
+      <div className={`paddock ${dockOpen ? 'is-open' : ''}`} role="radiogroup" aria-label={t('hall.padColor')} onMouseLeave={() => setDockOpen(false)}>
+        <button className="paddock__head" onClick={() => setDockOpen((v) => !v)} onMouseEnter={() => setDockOpen(true)} aria-expanded={dockOpen}>
+          <span className="paddock__cur" style={{ backgroundImage: `url(${padThumb({ id: picking ?? color.id })})`, ['--glow' as string]: (PAD_COLORS.find((c) => c.id === (picking ?? color.id)) ?? color).glow }} />
+          <span className="paddock__title">{t('hall.padColor')}</span>
+          <span className="paddock__name" key={picking ?? color.id}>{(PAD_COLORS.find((c) => c.id === (picking ?? color.id)) ?? color).name[lang]}</span>
+          <span className="paddock__chev" aria-hidden="true" />
+        </button>
+        <div className="paddock__list">
+          {PAD_COLORS.map((c) => {
+            const on = (picking ?? color.id) === c.id
+            return (
+              <button
+                key={c.id}
+                role="radio"
+                aria-checked={on}
+                aria-label={c.name[lang]}
+                title={c.name[lang]}
+                className={`paddock__sw ${on ? 'is-on' : ''}`}
+                style={{ ['--glow' as string]: c.glow }}
+                onMouseEnter={() => preloadPad(c)}
+                onClick={(e) => pickColor(c, e)}
+              >
+                <span style={{ backgroundImage: `url(${padThumb(c)})` }} />
+              </button>
+            )
+          })}
         </div>
       </div>
 

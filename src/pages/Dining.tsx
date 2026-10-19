@@ -2,12 +2,13 @@ import { useLayoutEffect, useRef } from 'react'
 import gsap from 'gsap'
 import ScrollSequence from '../components/ScrollSequence'
 import Branches from '../components/Branches'
-import { diningBranches } from '../data/branches'
-import { dishSrc, fmtPrice, menu, pageSrc } from '../data/menu'
+import TeamSection from '../components/team/TeamSection'
+import { dishSrc, menu, pageSrc } from '../data/menu'
 import { useGo } from '../lib/transition'
 import { useReserve } from '../components/Reserve'
 import { useI18n, type L } from '../lib/i18n'
 import { itemName, translateDesc } from '../data/menu-i18n'
+import { HOOKAHS } from '../data/hookah'
 
 const FRAMES = 120
 const frame = (i: number) => `/media/dining/seq/f_${String(i).padStart(3, '0')}.webp`
@@ -101,7 +102,7 @@ export default function Dining() {
         </ul>
       </section>
 
-      <section className="menu-teaser" aria-labelledby="mt-title">
+      <section className="menu-teaser" id="menyu" aria-labelledby="mt-title">
         <div className="menu-teaser__book" aria-hidden="true">
           <img src={pageSrc(1)} alt="" loading="lazy" />
         </div>
@@ -124,14 +125,38 @@ export default function Dining() {
               <div className="pick__body">
                 <h3>{itemName(d, lang)}</h3>
                 <p>{d.desc && translateDesc(d.desc, lang)}</p>
-                <span className="pick__price">{fmtPrice(d.price)}</span>
               </div>
             </li>
           ))}
         </ul>
+
+        {/* hookah — the chef's tobacco picks */}
+        <div className="hk">
+          <div className="hk__head">
+            <span className="hk__smoke" aria-hidden="true"><i /><i /><i /></span>
+            <h3>{t('dn.hookahTitle')}</h3>
+            <p>{t('dn.hookahText')}</p>
+          </div>
+          <ul className="hk__list">
+            {HOOKAHS.map((h) => (
+              <li key={h.id} className="hk__item" style={{ ['--c1' as string]: h.tags[0], ['--c2' as string]: h.tags[1] }}>
+                <span className="hk__dot" aria-hidden="true" />
+                <div>
+                  <strong>{tr(h.name)}</strong>
+                  <p>{tr(h.notes)}</p>
+                </div>
+                <span className="hk__str" aria-label={`${t('dn.hookahStrength')}: ${h.strength}/3`}>
+                  {[1, 2, 3].map((n) => <i key={n} className={n <= h.strength ? 'is-on' : ''} />)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
 
-      <Branches id="filiallar" title={t('dn.branchesTitle')} venue="dining" branches={diningBranches} />
+      <Branches id="filiallar" title={t('dn.branchesTitle')} venue="dining" />
+
+      <TeamSection venue="dining" />
     </div>
   )
 }

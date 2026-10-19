@@ -16,6 +16,8 @@ gsap.registerPlugin(MotionPathPlugin)
 const BOX_LIFT = 10 // px a case pops up while a disc goes in / comes out
 const LIFT = '-40%' // lid of the case whose disc is on screen stays slid up
 const trayDisc = (tray: Element | null) => tray?.querySelector('.disc') ?? null
+const COPIES = 3 // the rail is rendered three times so it can drift endlessly
+const DRIFT = 42 // px per second the rail glides on its own
 const spinOf = (el: Element | null) => el?.querySelector('.disc__spin') ?? null
 const labelOf = (el: Element | null) => el?.querySelector('.disc__label') ?? null
 
@@ -58,7 +60,10 @@ function Shelf({ games }: { games: Game[] }) {
   const trays = useRef<(HTMLDivElement | null)[]>([])
   const spin = useRef<gsap.core.Tween | null>(null)
   const busy = useRef(false)
-  const pending = useRef<{ from: number; to: number } | null>(null)
+  const pending = useRef<{ from: number; to: number; k: number } | null>(null)
+  const n = games.length
+  const copiesOf = (i: number) => Array.from({ length: COPIES }, (_, c) => c * n + i)
+  const playingRef = useRef(false)
   const flightKey = useRef(0)
   const reduced = prefersReducedMotion()
 
@@ -74,9 +79,32 @@ function Shelf({ games }: { games: Game[] }) {
 
   // cases rest closed and straight; the one whose disc is on screen keeps its lid slid up, tray empty
   useLayoutEffect(() => {
-    lids.current.forEach((lid, i) => gsap.set(lid, { y: i === 0 ? LIFT : 0 }))
-    trays.current.forEach((tr, i) => gsap.set(trayDisc(tr), { opacity: i === 0 ? 0 : 1 }))
+    lids.current.forEach((lid, k) => gsap.set(lid, { y: k % n === 0 ? LIFT : 0 }))
+    trays.current.forEach((tr, k) => gsap.set(trayDisc(tr), { opacity: k % n === 0 ? 0 : 1 }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /** put every copy of the rail into the resting state for the selected game */
+  const syncCopies = useCallback((sel: number) => {
+    lids.current.forEach((lid, k) => gsap.set(lid, { y: k % n === sel ? LIFT : 0 }))
+    trays.current.forEach((tr, k) => gsap.set(trayDisc(tr), { opacity: k % n === sel ? 0 : 1 }))
+  }, [n])
+
+  /** the copy of game i that is closest to the middle of the rail */
+  const nearestK = useCallback((i: number) => {
+    const rail = railRef.current
+    if (!rail) return n + i
+    const mid = rail.scrollLeft + rail.clientWidth / 2
+    let best = n + i, d = Infinity
+    copiesOf(i).forEach((k) => {
+      const el = rail.children[k] as HTMLElement | undefined
+      if (!el) return
+      const dd = Math.abs(el.offsetLeft + el.offsetWidth / 2 - mid)
+      if (dd < d) { d = dd; best = k }
+    })
+    return best
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [n])
 
   // entrance
   useLayoutEffect(() => {
@@ -86,22 +114,22 @@ function Shelf({ games }: { games: Game[] }) {
         .from(caseRef.current, { x: -80, rotateY: 50, opacity: 0, duration: 1.1, ease: 'expo.out' })
         .from(discRef.current, { x: '-55%', scale: 0.8, opacity: 0, duration: 1.3, ease: 'expo.out' }, '-=0.8')
         .from('.shelf__info > *', { y: 24, opacity: 0, stagger: 0.06, duration: 0.8, ease: 'power3.out' }, '-=1')
-        .from('.jcase', { y: 40, opacity: 0, stagger: 0.03, duration: 0.7, ease: 'power3.out' }, '-=0.9')
+        .from('.jcase', { y: 40, opacity: 0, stagger: 0.015, duration: 0.7, ease: 'power3.out' }, '-=0.9')
     }, section)
     return () => ctx.revert()
   }, [reduced])
 
   /** hover preview: any case opens exactly like the on-screen one (lid slides up), disc still inside */
-  const peek = (i: number, open: boolean) => {
-    if (i === idx || busy.current) return
-    const lid = lids.current[i]
+  const peek = (k: number, open: boolean) => {
+    if (k % n === idx || busy.current) return
+    const lid = lids.current[k]
     if (lid) gsap.to(lid, { y: open ? LIFT : 0, duration: open ? 0.35 : 0.3, ease: open ? 'power3.out' : 'power3.inOut', overwrite: 'auto' })
   }
 
   /** centre a case in the rail; instant during a flight so measurements stay valid */
-  const centerCase = useCallback((i: number, smooth = false) => {
+  const centerCase = useCallback((k: number, smooth = false) => {
     const rail = railRef.current
-    const item = rail?.children[i] as HTMLElement | undefined
+    const item = rail?.children[k] as HTMLElement | undefined
     if (!rail || !item) return
     const left = Math.max(0, Math.min(rail.scrollWidth - rail.clientWidth, item.offsetLeft - rail.clientWidth / 2 + item.clientWidth / 2))
     if (smooth) rail.scrollTo({ left, behavior: 'smooth' })
@@ -112,40 +140,63 @@ function Shelf({ games }: { games: Game[] }) {
   /*  Swap: open the chosen case, its disc flies to the stage,           */
   /*  the current disc flies home and its case closes.                   */
   /* ------------------------------------------------------------------ */
-  const select = useCallback((nextRaw: number) => {
+  const select = useCallback((nextRaw: number, clickedK?: number) => {
     const next = wrap(nextRaw)
     if (next === idx || busy.current || playing || loading) return
     const prev = idx
+    const k = clickedK ?? nearestK(next)
     setIdx(next)
     if (reduced) {
-      lids.current.forEach((lid, i) => gsap.set(lid, { y: i === next ? LIFT : 0 }))
-      trays.current.forEach((tr, i) => gsap.set(trayDisc(tr), { opacity: i === next ? 0 : 1 }))
+      syncCopies(next)
       setShown(next)
-      centerCase(next, true)
+      centerCase(k, true)
       return
     }
     busy.current = true
-    pending.current = { from: prev, to: next }
-    flightKey.current += 1
-    setFlyIn({ game: games[next], key: flightKey.current })
-    setFlyOut({ game: games[prev], key: flightKey.current })
+    const rail = railRef.current
+    // freeze the rail right now: the disc must leave from exactly where its case is
+    rail?.classList.add('is-flying')
+    inertia.current = 0
+    const launch = () => {
+      pending.current = { from: prev, to: next, k }
+      flightKey.current += 1
+      setFlyIn({ game: games[next], key: flightKey.current })
+      setFlyOut({ game: games[prev], key: flightKey.current })
+    }
+    // chosen with the arrows / keyboard and its case is (partly) off the rail?
+    // glide it into view first, then take the disc out from where it stops
+    const item = rail?.children[k] as HTMLElement | undefined
+    if (rail && item && clickedK === undefined) {
+      const l = item.offsetLeft - rail.scrollLeft, r = l + item.offsetWidth
+      const pad = rail.clientWidth * 0.08
+      if (l < pad || r > rail.clientWidth - pad) {
+        const target = Math.max(0, Math.min(rail.scrollWidth - rail.clientWidth, item.offsetLeft - rail.clientWidth / 2 + item.offsetWidth / 2))
+        gsap.to(rail, { scrollLeft: target, duration: 0.55, ease: 'power3.inOut', onComplete: launch })
+        return
+      }
+    }
+    launch()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx, reduced, playing, loading, centerCase, games])
+  }, [idx, reduced, playing, loading, centerCase, games, nearestK, syncCopies])
 
   // run the flight once the flyers are mounted
   useLayoutEffect(() => {
     const p = pending.current
     if (!p || !flyIn || !flyOut) return
     const fin = flyInRef.current, fout = flyOutRef.current
-    const stage = discRef.current, inTray = trays.current[p.to], outTray = trays.current[p.from]
-    const inLid = lids.current[p.to], outLid = lids.current[p.from]
-    if (!fin || !fout || !stage || !inTray || !outTray) return
-
     const sec = section.current!, rail = railRef.current!
-    // bring the chosen case to the middle of the rail BEFORE measuring, and freeze the rail
-    // freeze the rail first (no scroll-snap re-alignment after we measure), then centre the chosen case
+    // the rail is frozen (no drift / drag / snapping) and is NOT moved: we measure the cases where they are
     rail.classList.add('is-flying')
-    centerCase(p.to)
+    const outK = nearestK(p.from)
+    const stage = discRef.current, inTray = trays.current[p.k], outTray = trays.current[outK]
+    const inLid = lids.current[p.k], outLid = lids.current[outK]
+    if (!fin || !fout || !stage || !inTray || !outTray) { rail.classList.remove('is-flying'); busy.current = false; pending.current = null; return }
+    // the other copies of the chosen game open straight away (they are off screen)
+    copiesOf(p.to).forEach((k) => {
+      if (k === p.k) return
+      gsap.set(lids.current[k], { y: LIFT })
+      gsap.set(trayDisc(trays.current[k]), { opacity: 0 })
+    })
 
     // positions are relative to the section, so page scrolling mid-flight can't desync them
     const base = sec.getBoundingClientRect()
@@ -179,6 +230,7 @@ function Shelf({ games }: { games: Game[] }) {
 
     const tl = gsap.timeline({
       onComplete: () => {
+        syncCopies(p.to)
         pending.current = null
         setFlyIn(null)
         setFlyOut(null)
@@ -259,6 +311,116 @@ function Shelf({ games }: { games: Game[] }) {
     return () => { tl.kill(); rail.classList.remove('is-flying'); spin.current?.play() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flyIn, flyOut])
+
+  playingRef.current = !!playing || loading
+
+  /* ------------------------------------------------------------------ */
+  /*  The rail glides on its own, endlessly (three copies, wrapped),     */
+  /*  and can be dragged with the mouse — with a little inertia.         */
+  /* ------------------------------------------------------------------ */
+  const hover = useRef(false)
+  const dragRail = useRef<{ x: number; start: number; lastX: number; lastT: number; v: number; moved: boolean } | null>(null)
+  const pos = useRef(0)
+  const inertia = useRef(0)
+  const resumeAt = useRef(0)
+
+  const setWidth = () => {
+    const rail = railRef.current
+    const a = rail?.children[0] as HTMLElement | undefined
+    const b = rail?.children[n] as HTMLElement | undefined
+    return a && b ? b.offsetLeft - a.offsetLeft : 0
+  }
+  /** keep the position inside the middle copy — the jump is invisible because the copies are identical */
+  const wrapPos = (x: number) => {
+    const w = setWidth()
+    if (!w) return x
+    if (x < w * 0.5) return x + w
+    if (x > w * 1.5) return x - w
+    return x
+  }
+
+  useEffect(() => {
+    const rail = railRef.current
+    if (!rail) return
+    centerCase(n + idx)
+    pos.current = rail.scrollLeft
+    let visible = false
+    const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting }, { threshold: 0.05 })
+    io.observe(rail)
+
+    let raf = 0, last = performance.now()
+    const tick = (now: number) => {
+      const dt = Math.min(64, now - last)
+      last = now
+      const flying = rail.classList.contains('is-flying')
+      if (flying || playingRef.current) {
+        pos.current = rail.scrollLeft
+        inertia.current = 0
+      } else if (dragRail.current) {
+        // the drag handler moves pos; just apply it
+        rail.scrollLeft = pos.current
+      } else if (Math.abs(inertia.current) > 0.01) {
+        pos.current = wrapPos(pos.current - inertia.current * dt)
+        inertia.current *= Math.pow(0.94, dt / 16)
+        rail.scrollLeft = pos.current
+      } else if (visible && !hover.current && !document.hidden && now > resumeAt.current && !reduced) {
+        // drift — read the real scroll position first so a touch swipe is never fought
+        if (Math.abs(rail.scrollLeft - pos.current) > 2) pos.current = rail.scrollLeft
+        pos.current = wrapPos(pos.current + (DRIFT * dt) / 1000)
+        rail.scrollLeft = pos.current
+      } else {
+        pos.current = rail.scrollLeft
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => { cancelAnimationFrame(raf); io.disconnect() }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [n, reduced])
+
+  const onRailDown = (e: React.PointerEvent) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0 || busy.current) return
+    e.preventDefault() // no native image drag / text selection
+    const rail = railRef.current!
+    inertia.current = 0
+    dragRail.current = { x: e.clientX, start: rail.scrollLeft, lastX: e.clientX, lastT: performance.now(), v: 0, moved: false }
+
+    const move = (ev: PointerEvent) => {
+      const d = dragRail.current
+      if (!d) return
+      const dx = ev.clientX - d.x
+      if (!d.moved && Math.abs(dx) > 5) { d.moved = true; rail.classList.add('is-dragging') }
+      const now = performance.now()
+      const v = (ev.clientX - d.lastX) / Math.max(1, now - d.lastT)
+      d.v = d.v * 0.6 + v * 0.4
+      d.lastX = ev.clientX
+      d.lastT = now
+      const raw = d.start - dx
+      const wrapped = wrapPos(raw)
+      if (wrapped !== raw) d.start += wrapped - raw
+      pos.current = wrapped
+    }
+    const up = () => {
+      const d = dragRail.current
+      dragRail.current = null
+      rail.classList.remove('is-dragging')
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+      if (!d) return
+      resumeAt.current = performance.now() + 1800
+      if (d.moved) {
+        inertia.current = Math.max(-3, Math.min(3, d.v))
+        // a drag is not a click
+        const stop = (ce: MouseEvent) => { ce.stopPropagation(); ce.preventDefault() }
+        window.addEventListener('click', stop, { capture: true, once: true })
+        window.setTimeout(() => window.removeEventListener('click', stop, { capture: true }), 50)
+      }
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+  }
 
   // keyboard while the shelf is on screen
   useEffect(() => {
@@ -388,27 +550,50 @@ function Shelf({ games }: { games: Game[] }) {
         </div>
       </div>
 
-      <div ref={railRef} className="shelf__rail" role="listbox" aria-label={t('shelf.games')}>
-        {games.map((g, i) => (
+      <div
+        ref={railRef}
+        className="shelf__rail"
+        role="listbox"
+        aria-label={t('shelf.games')}
+        onPointerDown={onRailDown}
+        // the rail only pauses while the pointer is on a case itself (not the empty space above / between them)
+        onPointerMove={(e) => {
+          if (e.pointerType !== 'mouse') return
+          const on = !!(e.target as Element).closest('.jcase__box, .jcase__name')
+          if (hover.current && !on) resumeAt.current = Math.max(resumeAt.current, performance.now() + 350)
+          hover.current = on
+        }}
+        onPointerLeave={() => { if (hover.current) resumeAt.current = Math.max(resumeAt.current, performance.now() + 350); hover.current = false }}
+        onWheel={() => { resumeAt.current = performance.now() + 1800 }}
+        onTouchStart={() => { resumeAt.current = performance.now() + 2500 }}
+      >
+        {Array.from({ length: COPIES * n }, (_, k) => {
+          const i = k % n
+          const g = games[i]
+          const clone = k < n || k >= 2 * n
+          return (
           <button
-            key={g.id}
+            key={k}
             role="option"
             aria-selected={i === idx}
+            aria-hidden={clone || undefined}
+            tabIndex={clone ? -1 : 0}
             className={`jcase ${i === idx ? 'is-active' : ''}`}
-            onMouseEnter={() => peek(i, true)}
-            onMouseLeave={() => peek(i, false)}
-            onFocus={() => peek(i, true)}
-            onBlur={() => peek(i, false)}
-            onClick={() => select(i)}
+            onMouseEnter={() => peek(k, true)}
+            onMouseLeave={() => peek(k, false)}
+            onFocus={() => peek(k, true)}
+            onBlur={() => peek(k, false)}
+            onClick={() => select(i, k)}
             style={{ ['--accent' as string]: g.accent }}
             aria-label={g.title}
+            draggable={false}
           >
             <span className="jcase__box">
-              <span className="jcase__tray" ref={(el) => { trays.current[i] = el as HTMLDivElement | null }}>
+              <span className="jcase__tray" ref={(el) => { trays.current[k] = el as HTMLDivElement | null }}>
                 <span className="jcase__slot" aria-hidden="true"><span>{t('shelf.onScreen')}</span></span>
                 <Disc game={g} className="disc--mini" />
               </span>
-              <span className="jcase__lid" ref={(el) => { lids.current[i] = el as HTMLDivElement | null }}>
+              <span className="jcase__lid" ref={(el) => { lids.current[k] = el as HTMLDivElement | null }}>
                 <span className="jcase__front">
                   <span className="jcase__band"><span>LALIGA</span><small>PS5</small></span>
                   <span className="jcase__art"><Cover game={g} /></span>
@@ -420,7 +605,8 @@ function Shelf({ games }: { games: Game[] }) {
             </span>
             <span className="jcase__name">{g.title}</span>
           </button>
-        ))}
+          )
+        })}
       </div>
 
       {flyOut && (
