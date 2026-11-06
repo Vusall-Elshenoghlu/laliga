@@ -30,7 +30,7 @@ function RouteEffects() {
     document.documentElement.dataset.mode = mode
     if (pathname.includes('/filiallar/') || pathname.startsWith('/komanda/')) return // these pages set their own title
     const titles = { home: t('title.home'), game: 'LaLiga Game Center', dining: 'LaLiga Dining & Lounge' }
-    document.title = pathname === '/komanda' ? t('title.team') : pathname === '/karyera' ? t('title.careers') : pathname === '/elaqe' ? t('title.contact') : pathname === '/dining/menu' ? t('title.menu') : pathname === '/game-center/hall' ? 'Game Hall · LaLiga' : titles[mode]
+    document.title = pathname === '/komanda' ? t('title.team') : pathname === '/karyera' ? t('title.careers') : pathname === '/elaqe' ? t('title.contact') : pathname.startsWith('/dining/menu') ? t('title.menu') : pathname === '/game-center/hall' ? 'Game Hall · LaLiga' : titles[mode]
   }, [mode, pathname, t, lang])
 
   useEffect(() => {
@@ -75,6 +75,7 @@ export default function App() {
               <Route path="/game-center/hall" element={<GameHall />} />
               <Route path="/dining" element={<Dining />} />
               <Route path="/dining/menu" element={<DiningMenu />} />
+              <Route path="/dining/menu/:branch" element={<DiningMenu />} />
               <Route path="/elaqe" element={<Contact />} />
               <Route path="/komanda" element={<Team />} />
               <Route path="/komanda/:venue" element={<TeamVenue />} />

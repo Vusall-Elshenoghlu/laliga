@@ -1,4 +1,5 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import gsap from 'gsap'
 import { HR_PHONE, JOBS, type Job } from '../services/team'
 import { STATIC_BRANCHES } from '../services/branches'
@@ -14,9 +15,15 @@ export default function Careers() {
   const { t, tr } = useI18n()
   const lenis = useLenis()
   const page = useRef<HTMLDivElement>(null)
-  const [filter, setFilter] = useState<Filter>('all')
-  const [open, setOpen] = useState<string | null>(null)
-  const [job, setJob] = useState<string>('')
+  // /karyera?venue=game&job=operator — arriving from a venue shows only its roles,
+  // arriving from one role opens it (and picks it in the form)
+  const [params] = useSearchParams()
+  const qVenue = params.get('venue')
+  const qJob = JOBS.find((j) => j.id === params.get('job'))?.id ?? null
+  const fromQuery = (): Filter => (qVenue === 'game' || qVenue === 'dining' ? qVenue : 'all')
+  const [filter, setFilter] = useState<Filter>(fromQuery)
+  const [open, setOpen] = useState<string | null>(qJob)
+  const [job, setJob] = useState<string>(qJob ?? '')
   const [branch, setBranch] = useState('')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -49,6 +56,18 @@ export default function Careers() {
   ].filter(Boolean).join('\n')
   const ok = name.trim().length > 1 && phone.replace(/\D/g, '').length >= 7
 
+  // the same page can be reached again with other parameters (e.g. from the navbar)
+  useEffect(() => {
+    setFilter(fromQuery())
+    setOpen(qJob)
+    if (qJob) setJob(qJob)
+    if (!qJob) return
+    // bring the opened role into view once the page has settled
+    const tm = window.setTimeout(() => scrollToTarget(lenis, `#job-${qJob}`, -120), 900)
+    return () => window.clearTimeout(tm)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qVenue, qJob])
+
   const applyFor = (id: string) => {
     setJob(id)
     scrollToTarget(lenis, '#cr-form', -90)
@@ -61,7 +80,7 @@ export default function Careers() {
         .from('.tp-hero__title .ln > span', { yPercent: 115, stagger: 0.09, duration: 1.2 })
         .from('.tp-hero__lead', { y: 24, opacity: 0, duration: 0.9 }, 0.35)
       gsap.utils.toArray<HTMLElement>('.tp-reveal').forEach((el) => {
-        gsap.from(el.children, { scrollTrigger: { trigger: el, start: 'top 85%' }, y: 40, opacity: 0, stagger: 0.07, duration: 0.9, ease: 'power3.out' })
+        gsap.from(el.children, { scrollTrigger: { trigger: el, start: 'top 85%' }, y: 40, opacity: 0, stagger: 0.07, duration: 0.9, ease: 'power3.out', clearProps: 'transform' })
       })
     }, page)
     return () => ctx.revert()
@@ -98,7 +117,7 @@ export default function Careers() {
         </div>
         <ul className="cr-list">
           {jobs.map((j) => (
-            <li key={j.id} className={`cr-job ${open === j.id ? 'is-open' : ''}`} data-venue={j.venue}>
+            <li key={j.id} id={`job-${j.id}`} className={`cr-job ${open === j.id ? 'is-open' : ''}`} data-venue={j.venue}>
               <button className="cr-job__top" aria-expanded={open === j.id} onClick={() => setOpen(open === j.id ? null : j.id)}>
                 <span className="cr-job__venue">{venueLabel(j)}</span>
                 <strong>{tr(j.title)}</strong>

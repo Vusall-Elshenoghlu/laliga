@@ -33,7 +33,7 @@ export default function TeamSection({ venue }: { venue: Venue }) {
           <a className="tms__btn tms__btn--main" href={`/komanda/${venue}`} onClick={(e) => { e.preventDefault(); go(`/komanda/${venue}`) }}>
             {t('tm.meet')} <span aria-hidden="true">→</span>
           </a>
-          <a className="tms__btn" href="/karyera" onClick={(e) => { e.preventDefault(); go('/karyera') }}>
+          <a className="tms__btn" href={`/karyera?venue=${venue}`} onClick={(e) => { e.preventDefault(); go(`/karyera?venue=${venue}`) }}>
             {t('tm.join')}
           </a>
         </div>

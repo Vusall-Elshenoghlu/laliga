@@ -22,7 +22,7 @@ export default function Team() {
         .from('.tp-hero__title .ln > span', { yPercent: 115, stagger: 0.09, duration: 1.2 })
         .from('.tp-hero__lead, .tp-stats > *', { y: 24, opacity: 0, stagger: 0.07, duration: 0.9 }, 0.35)
       gsap.utils.toArray<HTMLElement>('.tp-reveal').forEach((el) => {
-        gsap.from(el.children, { scrollTrigger: { trigger: el, start: 'top 82%' }, y: 50, opacity: 0, stagger: 0.08, duration: 1, ease: 'power3.out' })
+        gsap.from(el.children, { scrollTrigger: { trigger: el, start: 'top 82%' }, y: 50, opacity: 0, stagger: 0.08, duration: 1, ease: 'power3.out', clearProps: 'transform' })
       })
       // stat counters
       gsap.utils.toArray<HTMLElement>('.tp-stats b[data-n]').forEach((b) => {

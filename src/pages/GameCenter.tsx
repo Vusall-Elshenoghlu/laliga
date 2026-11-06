@@ -1,5 +1,4 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { HandsBack, HandsFront } from '../components/game/Hands'
 import Controller, { loadPadColor } from '../components/game/Controller'
 import { prefersReducedMotion } from '../lib/smooth'
 import gsap from 'gsap'
@@ -31,11 +30,6 @@ export default function GameCenter() {
       gsap.utils.toArray<HTMLElement>('.how__step').forEach((el, i) => {
         gsap.from(el, { scrollTrigger: { trigger: el, start: 'top 85%' }, y: 40, opacity: 0, duration: 0.9, delay: i * 0.08, ease: 'power3.out' })
       })
-      // hands wait below the controller until "Pick up the controller" is pressed
-      // both layers (hand behind, thumb on top) of a side get identical transforms, so they stay glued
-      gsap.set('.hall-teaser .hand-move--left', { xPercent: -14, yPercent: 48, rotate: -10, opacity: 0, transformOrigin: '55% 95%' })
-      gsap.set('.hall-teaser .hand-move--right', { xPercent: 14, yPercent: 48, rotate: 10, opacity: 0, transformOrigin: '45% 95%' })
-      gsap.set('.hall-teaser .hands--front', { opacity: 0 })
       gsap.from('.hall-teaser__wrap', {
         scrollTrigger: { trigger: '.hall-teaser', start: 'top bottom', end: 'bottom top', scrub: true },
         yPercent: 6, rotate: -2, ease: 'none',
@@ -56,18 +50,11 @@ export default function GameCenter() {
     const q = (sel: string) => page.current!.querySelectorAll(`.hall-teaser ${sel}`)
     gsap.timeline({ onComplete: () => { go('/game-center/hall'); window.setTimeout(() => { grabbing.current = false }, 1500) } })
       .to(q('.hall-teaser__copy'), { opacity: 0, x: -40, duration: 0.5, ease: 'power2.in' }, 0)
-      // hands reach in from below, opening slightly wider than the grips…
-      // (the copy behind the controller is the one you see now — hands rise from behind the grips)
-      .to(q('.hand-move--left'), { xPercent: -6, yPercent: 8, rotate: -4, opacity: 1, duration: 0.75, ease: 'power3.out' }, 0.05)
-      .to(q('.hand-move--right'), { xPercent: 6, yPercent: 8, rotate: 4, opacity: 1, duration: 0.75, ease: 'power3.out' }, 0.1)
-      // …then close round the grips: thumbs and fingers come over the controller
-      .to(q('.hand-move--left, .hand-move--right'), { xPercent: 0, yPercent: 0, rotate: 0, duration: 0.42, ease: 'power3.inOut' }, 0.72)
-      .to(q('.hands--front'), { opacity: 1, duration: 0.28, ease: 'power1.inOut' }, 0.8)
-      // a small squeeze as they take the weight
-      .to(lift, { y: 6, scale: 0.995, duration: 0.12, ease: 'power2.out', yoyo: true, repeat: 1 }, 1.0)
-      // and lift it up towards the viewer, into the centre of the screen
-      .to(lift, { x: dx, y: dy, scale: 1.12, rotate: -2, duration: 1, ease: 'expo.inOut' }, 1.05)
-      .to(lift, { rotate: 0, duration: 0.3, ease: 'sine.inOut' }, 1.85)
+      // a small dip, as if it's being picked up…
+      .to(lift, { y: 10, scale: 0.97, rotate: 1.5, duration: 0.22, ease: 'power2.out' }, 0)
+      // …then it floats up towards the viewer, into the centre of the screen
+      .to(lift, { x: dx, y: dy, scale: 1.14, rotate: -2.5, duration: 1.1, ease: 'expo.inOut' }, 0.22)
+      .to(lift, { rotate: 0, scale: 1.12, duration: 0.35, ease: 'sine.inOut' }, 1.15)
   }
 
   return (
@@ -143,7 +130,6 @@ export default function GameCenter() {
         <div className="hall-teaser__wrap">
           <div className="hall-teaser__lift" onClick={grab}>
             <div className="hall-teaser__rig">
-              <HandsBack />
               <Controller className="hall-teaser__console" color={padColor} alt={t('gc.hallAlt')} />
               {/* the controller's screen shows the same LaLiga boot screen as the Game Hall */}
               <div className="hall-teaser__ui" aria-hidden="true">
@@ -154,7 +140,6 @@ export default function GameCenter() {
                 </div>
               </div>
               <div className="hall-teaser__name" aria-hidden="true">LaLiga</div>
-              <HandsFront />
             </div>
           </div>
         </div>

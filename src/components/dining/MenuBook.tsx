@@ -1,13 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import { MENU_PAGES, menu, pageSrc } from '../../data/menu'
+import { branchPageSrc, menuFor, type MenuBranch } from '../../data/menus'
 import { scrollToTarget, useLenis, prefersReducedMotion } from '../../lib/smooth'
 import { useI18n } from '../../lib/i18n'
 import { catName } from '../../data/menu-i18n'
 import { playPageTurn, setSoundEnabled, soundEnabled, unlock } from '../../lib/pageSound'
 
-const SHEETS = MENU_PAGES / 2 // 28
 const VH_PER_FLIP = 55
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
@@ -15,7 +14,17 @@ const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 
 /** Spread index s shows page 2s on the left and 2s+1 on the right. */
 const spreadOfPage = (n: number) => Math.floor(n / 2)
 
-export default function MenuBook() {
+/** the flip-book of one branch's menu; `header` (the branch switch) sits under the title */
+export default function MenuBook({ branch, header }: { branch: MenuBranch; header?: ReactNode }) {
+  const MENU_PAGES = branch.pages
+  // an odd page count leaves the last back face blank
+  const SHEETS = Math.ceil(MENU_PAGES / 2)
+  const menu = menuFor(branch.id)
+  const pageSrc = (n: number) => branchPageSrc(branch, n)
+  // book slots → PDF pages. With an odd page count a blank leaf goes before the last page,
+  // so the PDF's back cover still ends up on the back of the book.
+  const pdfPage = (slot: number): number | null =>
+    MENU_PAGES % 2 === 0 || slot < 2 * SHEETS - 1 ? slot : slot === 2 * SHEETS ? MENU_PAGES : null
   const lenis = useLenis()
   const { t, lang } = useI18n()
   const section = useRef<HTMLElement>(null)
@@ -151,25 +160,28 @@ export default function MenuBook() {
       <div className="book__stage">
         <div className="book__intro">
           <h1>{t('menu.title')}</h1>
+          {header}
           <p>{t('menu.hint')}</p>
         </div>
 
         <div className="book__table">
-          <div ref={book} className="book__book">
+          <div ref={book} className="book__book" style={{ ['--pa' as string]: branch.aspect }}>
             <div className="book__spine" aria-hidden="true" />
             {Array.from({ length: SHEETS }, (_, k) => {
-              const front = 2 * k + 1
-              const back = 2 * k + 2
+              const face = (slot: number, side: 'front' | 'back', active: boolean) => {
+                const n = pdfPage(slot)
+                if (n === null) return <div className={`sheet__face sheet__face--${side} sheet__face--blank`} aria-hidden="true"><span className="sheet__shade" /></div>
+                return (
+                  <button className={`sheet__face sheet__face--${side}`} onClick={() => setZoom(n)} aria-label={`${t('menu.page')} ${n} — ${t('menu.enlarge')}`} tabIndex={active ? 0 : -1}>
+                    <img data-page={n} alt="" draggable={false} />
+                    <span className="sheet__shade" aria-hidden="true" />
+                  </button>
+                )
+              }
               return (
                 <div key={k} ref={(el) => { if (el) sheets.current[k] = el }} className={`sheet ${k === 0 ? 'sheet--cover' : ''} ${k === SHEETS - 1 ? 'sheet--last' : ''}`}>
-                  <button className="sheet__face sheet__face--front" onClick={() => setZoom(front)} aria-label={`${t('menu.page')} ${front} — ${t('menu.enlarge')}`} tabIndex={spread === k ? 0 : -1}>
-                    <img data-page={front} alt="" draggable={false} />
-                    <span className="sheet__shade" aria-hidden="true" />
-                  </button>
-                  <button className="sheet__face sheet__face--back" onClick={() => setZoom(back)} aria-label={`${t('menu.page')} ${back} — ${t('menu.enlarge')}`} tabIndex={spread === k + 1 ? 0 : -1}>
-                    <img data-page={back} alt="" draggable={false} />
-                    <span className="sheet__shade" aria-hidden="true" />
-                  </button>
+                  {face(2 * k + 1, 'front', spread === k)}
+                  {face(2 * k + 2, 'back', spread === k + 1)}
                 </div>
               )
             })}

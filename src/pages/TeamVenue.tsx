@@ -40,7 +40,7 @@ function Detail({ venue }: { venue: Venue }) {
         .from('.tv-hero__lead, .tp-stats > *', { y: 24, opacity: 0, stagger: 0.07, duration: 0.9 }, 0.45)
       gsap.to('.tv-hero__bg img', { yPercent: 14, ease: 'none', scrollTrigger: { trigger: '.tv-hero', start: 'top top', end: 'bottom top', scrub: true } })
       gsap.utils.toArray<HTMLElement>('.tp-reveal').forEach((el) => {
-        gsap.from(el.children, { scrollTrigger: { trigger: el, start: 'top 84%' }, y: 46, opacity: 0, stagger: 0.08, duration: 1, ease: 'power3.out' })
+        gsap.from(el.children, { scrollTrigger: { trigger: el, start: 'top 84%' }, y: 46, opacity: 0, stagger: 0.08, duration: 1, ease: 'power3.out', clearProps: 'transform' })
       })
       // timeline line draws as you scroll
       gsap.fromTo('.tv-shift__line i', { scaleY: 0 }, { scaleY: 1, ease: 'none', scrollTrigger: { trigger: '.tv-shift__list', start: 'top 70%', end: 'bottom 60%', scrub: true } })
@@ -127,12 +127,12 @@ function Detail({ venue }: { venue: Venue }) {
       <section className="tv-roles" aria-labelledby="tv-roles">
         <div className="cr-jobs__head tp-reveal">
           <h2 id="tv-roles" className="ct-h2">{t('tm.rolesTitle')}</h2>
-          <a className="tms__btn" href="/karyera" onClick={(e) => { e.preventDefault(); go('/karyera') }}>{t('tm.allRoles')} →</a>
+          <a className="tms__btn" href={`/karyera?venue=${venue}`} onClick={(e) => { e.preventDefault(); go(`/karyera?venue=${venue}`) }}>{t('tm.allRoles')} →</a>
         </div>
         <ul className="tv-roles__grid tp-reveal">
           {jobs.map((j) => (
             <li key={j.id}>
-              <a href="/karyera" onClick={(e) => { e.preventDefault(); go('/karyera') }}>
+              <a href={`/karyera?venue=${venue}&job=${j.id}`} onClick={(e) => { e.preventDefault(); go(`/karyera?venue=${venue}&job=${j.id}`) }}>
                 <span className="cr-job__meta">{tr(j.type)}</span>
                 <strong>{tr(j.title)}</strong>
                 <span className="cr-job__meta">{tr(j.shift)}</span>
@@ -146,7 +146,7 @@ function Detail({ venue }: { venue: Venue }) {
       <section className="tp-cta tp-reveal">
         <h2>{t('tm.ctaTitle')}</h2>
         <p>{t('tm.ctaText')}</p>
-        <a className="tms__btn tms__btn--main" href="/karyera" onClick={(e) => { e.preventDefault(); go('/karyera') }}>
+        <a className="tms__btn tms__btn--main" href={`/karyera?venue=${venue}`} onClick={(e) => { e.preventDefault(); go(`/karyera?venue=${venue}`) }}>
           {t('tm.join')} <span aria-hidden="true">→</span>
         </a>
       </section>

@@ -8,6 +8,7 @@ import { useGo } from '../lib/transition'
 import { useReserve } from '../components/Reserve'
 import { useI18n, type Key } from '../lib/i18n'
 import { prefersReducedMotion } from '../lib/smooth'
+import { isMenuBranch, menuBranch } from '../data/menus'
 import Gallery from '../components/branch/Gallery'
 
 const VENUE_LABEL: Record<Venue, string> = { game: 'LaLiga Game Center', dining: 'LaLiga Dining & Lounge' }
@@ -120,7 +121,7 @@ function Detail({ branch: b, all }: { branch: Branch; all: Branch[] }) {
           { k: '24', title: 'br.f.24t', text: 'br.f.24d' },
         ]
       : [
-          { k: '56', title: 'br.f.menut', text: 'br.f.menud', cta: { label: 'br.f.open', to: '/dining/menu' } },
+          { k: String(isMenuBranch(b.id) ? menuBranch(b.id).pages : 56), title: 'br.f.menut', text: 'br.f.menud', cta: { label: 'br.f.open', to: isMenuBranch(b.id) ? `/dining/menu/${b.id}` : '/dining/menu' } },
           { k: '07', title: 'br.f.roomst', text: 'br.f.roomsd', cta: { label: 'br.f.open', to: '/dining#otaqlar' } },
           { k: '01', title: 'br.f.bookt', text: 'br.f.bookd', cta: { label: 'br.book', act: () => reserve(b.venue, b.id) } },
         ]

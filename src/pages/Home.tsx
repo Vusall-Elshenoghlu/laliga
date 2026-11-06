@@ -108,7 +108,12 @@ export default function Home() {
               </div>
               <div className="split__shade" aria-hidden="true" />
               <div className="split__content">
-                <div className="split__title-wrap"><h2 className="split__title">{p.title}</h2></div>
+                <div className="split__title-wrap"><h2 className="split__title">
+                  {/* the italic serif's "&" is a decorative "Et" glyph — show a plain ampersand instead */}
+                  {p.title.split('&').map((part, i) => (
+                    <span key={i}>{i > 0 && <span className="split__amp">&amp;</span>}{part}</span>
+                  ))}
+                </h2></div>
                 <p className="split__line">{t(p.line)}</p>
                 <ul className="split__tags">{t(p.tags).split('|').map((x) => <li key={x}>{x}</li>)}</ul>
                 <span className="split__cta">{t(p.cta)}<span aria-hidden="true" className="split__arrow" /></span>

@@ -1,12 +1,15 @@
-import { useMemo, useState } from 'react'
-import { dishSrc, fmtPrice, menu } from '../../data/menu'
+import { useMemo, useState, type ReactNode } from 'react'
+import { dishSrc, fmtPrice } from '../../data/menu'
+import { menuFor, type MenuBranch } from '../../data/menus'
 import { catName, itemAlt, itemName, translateDesc } from '../../data/menu-i18n'
 import { useI18n } from '../../lib/i18n'
 
 const norm = (s: string) =>
   s.toLocaleLowerCase('az').replace(/ə/g, 'e').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ç/g, 'c').replace(/ğ/g, 'g')
 
-export default function MenuList() {
+/** searchable list of one branch's menu (its own dishes and prices) */
+export default function MenuList({ branch, header }: { branch: MenuBranch; header?: ReactNode }) {
+  const menu = menuFor(branch.id)
   const { t, lang } = useI18n()
   const [q, setQ] = useState('')
   const [cat, setCat] = useState<string>('all')
@@ -20,12 +23,13 @@ export default function MenuList() {
         items: nq ? c.items.filter((i) => norm(`${i.az} ${i.en} ${itemName(i, 'ru')} ${i.desc ?? ''} ${i.desc ? translateDesc(i.desc, lang) : ''}`).includes(nq)) : c.items,
       }))
       .filter((c) => c.items.length)
-  }, [q, cat, lang])
+  }, [q, cat, lang, menu])
 
   const count = cats.reduce((n, c) => n + c.items.length, 0)
 
   return (
     <section className="mlist" aria-label={t('menu.list')}>
+      {header && <div className="mlist__head">{header}</div>}
       <div className="mlist__tools">
         <label className="mlist__search">
           <span className="sr-only">{t('menu.searchLabel')}</span>

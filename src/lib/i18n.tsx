@@ -272,6 +272,12 @@ const D = {
   'menu.soundOn': { az: 'Vərəqləmə səsini aç', en: 'Turn page sound on', ru: 'Включить звук страниц' },
   'menu.soundOff': { az: 'Vərəqləmə səsini bağla', en: 'Turn page sound off', ru: 'Выключить звук страниц' },
   'menu.backTo': { az: 'Dining-ə qayıt', en: 'Back to Dining', ru: 'Назад в Dining' },
+  'menu.branch': { az: 'Filial', en: 'Branch', ru: 'Филиал' },
+  'menu.pickTitle': { az: 'Hansı filialın menyusu?', en: 'Which branch’s menu?', ru: 'Меню какого филиала?' },
+  'menu.pickText': { az: 'Hər filialın öz menyusu və qiymətləri var. Olduğunuz və ya gedəcəyiniz filialı seçin.', en: 'Every branch has its own menu and prices. Pick the one you are in — or heading to.', ru: 'У каждого филиала своё меню и цены. Выберите филиал, в котором вы находитесь или куда собираетесь.' },
+  'menu.pickOpen': { az: 'Menyunu aç', en: 'Open the menu', ru: 'Открыть меню' },
+  'menu.pickLast': { az: 'Son baxdığınız', en: 'Last viewed', ru: 'Вы смотрели' },
+  'menu.pickNote': { az: 'Masadakı QR kodu oxutsanız, birbaşa həmin filialın menyusu açılır.', en: 'Scan the QR code on your table and that branch’s menu opens straight away.', ru: 'Отсканируйте QR-код на столе — сразу откроется меню этого филиала.' },
   'menu.aria': { az: 'Menyu kitabı', en: 'Menu book', ru: 'Книга меню' },
 
   // branches

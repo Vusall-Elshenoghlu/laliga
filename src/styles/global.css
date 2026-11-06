@@ -9107,3 +9107,294 @@ body {
     width: 100%;
   }
 }
+
+/* ==========================================================================
+   MENU — one menu per branch
+   ========================================================================== */
+/* each branch prints its menu at a slightly different page shape */
+.book__book {
+  --pa: 0.866;
+  --ph: min(calc(100svh - var(--nav-h) - 290px), calc((100vw - 2 * var(--gutter) - 400px) / 2 / var(--pa)));
+  width: calc(var(--ph) * var(--pa) * 2);
+}
+@media (max-width: 1100px) {
+  .book__book {
+    --ph: min(calc(100svh - var(--nav-h) - 290px), calc((100vw - 2 * var(--gutter)) / 2 / var(--pa)));
+  }
+}
+.sheet__face--blank {
+  cursor: default;
+  background:
+    radial-gradient(120% 90% at 20% 10%, rgba(255, 255, 255, 0.07), transparent 60%),
+    #2a1c12;
+}
+
+/* branch switch: three quiet tabs under the title */
+.mbr {
+  display: inline-flex;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(201, 162, 92, 0.32);
+  background: rgba(20, 13, 8, 0.6);
+  backdrop-filter: blur(10px);
+}
+.mbr button {
+  position: relative;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--d-mute);
+  transition: color 0.3s, background-color 0.3s;
+}
+.mbr button:hover {
+  color: var(--d-cream);
+}
+.mbr button[aria-selected='true'] {
+  color: #24170b;
+  background: linear-gradient(100deg, var(--d-brass), var(--d-brass-hi));
+  box-shadow: 0 6px 18px -8px rgba(232, 196, 120, 0.7);
+}
+.book__intro .mbr + p {
+  margin-top: 8px;
+}
+.mlist__head {
+  display: flex;
+  justify-content: center;
+  padding-bottom: 4px;
+}
+.mlist__head .mbr {
+  margin-top: 0;
+}
+@media (max-width: 420px) {
+  .mbr button {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+}
+
+/* ---------- picker: three closed menus on the table ---------- */
+.mpick {
+  min-height: 100svh;
+  padding: calc(var(--nav-h) + 56px) var(--gutter) 90px;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: clamp(30px, 5vw, 56px);
+  color: var(--d-cream);
+}
+.mpick__head {
+  text-align: center;
+  max-width: 640px;
+}
+.mpick__eyebrow {
+  display: inline-block;
+  font-size: 12px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--d-brass-hi);
+}
+.mpick__head h1 {
+  margin-top: 12px;
+  font-family: var(--f-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(40px, 6vw, 76px);
+  line-height: 1;
+}
+.mpick__head p {
+  margin-top: 14px;
+  color: var(--d-mute);
+  font-size: 16px;
+  line-height: 1.55;
+}
+.mpick__grid {
+  width: min(1100px, 100%);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(18px, 3vw, 40px);
+  perspective: 1400px;
+}
+.mpick__card {
+  --rx: 0deg;
+  --ry: 0deg;
+  display: grid;
+  gap: 18px;
+  justify-items: center;
+  text-align: center;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+}
+.mpick__book {
+  position: relative;
+  display: block;
+  width: min(100%, 260px);
+  aspect-ratio: var(--pa);
+  border-radius: 4px 10px 10px 4px;
+  overflow: hidden;
+  transform: rotateX(var(--rx)) rotateY(var(--ry)) translateZ(0);
+  transform-style: preserve-3d;
+  box-shadow:
+    0 2px 0 rgba(255, 255, 255, 0.06) inset,
+    0 30px 50px -24px rgba(0, 0, 0, 0.9),
+    0 12px 22px -12px rgba(0, 0, 0, 0.7);
+  transition: transform 0.5s var(--ease-out), box-shadow 0.5s var(--ease-out);
+}
+.mpick__card:hover .mpick__book,
+.mpick__card:focus-visible .mpick__book {
+  transform: rotateX(var(--rx)) rotateY(var(--ry)) translateY(-12px);
+  box-shadow:
+    0 2px 0 rgba(255, 255, 255, 0.08) inset,
+    0 50px 70px -30px rgba(0, 0, 0, 0.95),
+    0 0 0 1px rgba(232, 196, 120, 0.45),
+    0 0 50px -10px rgba(232, 196, 120, 0.35);
+}
+.mpick__book img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* a bound spine on the left edge */
+.mpick__spine {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 7%;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.45), rgba(255, 255, 255, 0.12) 55%, rgba(0, 0, 0, 0.2));
+}
+.mpick__gloss {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.16) 45%, transparent 60%);
+  transform: translateX(-60%);
+  transition: transform 0.9s var(--ease-out);
+}
+.mpick__card:hover .mpick__gloss {
+  transform: translateX(60%);
+}
+.mpick__meta {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+}
+.mpick__meta em {
+  font-style: normal;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: var(--d-brass-hi);
+  border: 1px solid rgba(232, 196, 120, 0.4);
+}
+.mpick__meta strong {
+  font-family: var(--f-serif);
+  font-size: clamp(26px, 2.6vw, 34px);
+  font-weight: 500;
+  line-height: 1.1;
+}
+.mpick__meta small {
+  font-size: 14px;
+  color: var(--d-mute);
+}
+.mpick__go {
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--d-brass-hi);
+}
+.mpick__go span {
+  display: inline-block;
+  transition: transform 0.4s var(--ease-out);
+}
+.mpick__card:hover .mpick__go span {
+  transform: translateX(5px);
+}
+.mpick__note {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--d-mute);
+  text-align: center;
+}
+@media (max-width: 760px) {
+  .mpick {
+    padding-top: calc(var(--nav-h) + 70px);
+  }
+  .mpick__grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+  /* phones: a row per branch — small cover on the left, name on the right */
+  .mpick__card {
+    grid-template-columns: 86px 1fr;
+    justify-items: start;
+    align-items: center;
+    text-align: left;
+    gap: 18px;
+    padding: 12px;
+    border-radius: 18px;
+    border: 1px solid rgba(201, 162, 92, 0.25);
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .mpick__book {
+    width: 86px;
+    transform: none !important;
+  }
+  .mpick__meta {
+    justify-items: start;
+  }
+  .mpick__go {
+    margin-top: 2px;
+  }
+}
+
+/* menu book: air between the hint, the book and the page counter */
+.book__intro {
+  padding-bottom: 22px;
+}
+.book__bar {
+  padding-top: 22px;
+}
+.book__book {
+  --ph: min(calc(100svh - var(--nav-h) - 334px), calc((100vw - 2 * var(--gutter) - 400px) / 2 / var(--pa)));
+}
+@media (max-width: 1100px) {
+  .book__book {
+    --ph: min(calc(100svh - var(--nav-h) - 334px), calc((100vw - 2 * var(--gutter)) / 2 / var(--pa)));
+  }
+}
+/* team detail: the "all vacancies" button sits on the title's line, with room above the cards */
+.tv-roles .cr-jobs__head {
+  align-items: center;
+}
+.tv-roles .tv-roles__grid {
+  margin-top: 36px;
+}
+
+/* reserve drawer: branch dropdown options were pale — give them a solid, readable surface */
+.reserve__panel .field select option {
+  background-color: var(--bg);
+  color: var(--text);
+  font-weight: 500;
+  opacity: 1;
+}
+.reserve__panel .field select option:checked {
+  background-color: color-mix(in srgb, var(--text) 16%, var(--bg));
+  color: var(--text);
+}
+.reserve__panel .field select:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--text) 45%, transparent);
+}
+
+/* home split: plain (upright) ampersand in "Dining & Lounge" — the italic one reads as "Et" */
+.split__amp {
+  font-style: normal;
+  font-weight: 400;
+  display: inline-block;
+  margin: 0 0.04em;
+}

@@ -47,17 +47,31 @@ export default function Navbar() {
   const { t, lang, setLang } = useI18n()
   const label = (l: Link) => (l.label.startsWith('nav.') ? t(l.label as Key) : l.label)
 
+  // over the scroll-scrubbed hero animations (Game Center / Dining) the bar slides away so the
+  // frames are seen clean; scrolling back up brings it in again, and it returns for good after the hero
+  const [hidden, setHidden] = useState(false)
   useEffect(() => {
-    const onScroll = () => {
+    let raf = 0
+    const check = () => {
+      raf = 0
       const y = window.scrollY
-      // the bar stays put (no hide-on-scroll); it only gains a solid backdrop once the page moves
+      const up = y < lastY.current - 2
+      const down = y > lastY.current + 2
       setScrolled(y > 40)
+      const seq = document.querySelector<HTMLElement>('.seq')
+      let inHero = false
+      if (seq && y > 40) {
+        const r = seq.getBoundingClientRect()
+        inHero = r.top <= 1 && r.bottom > window.innerHeight * 0.5
+      }
+      setHidden((h) => (!inHero ? false : down ? true : up ? false : h))
       lastY.current = y
     }
-    onScroll()
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(check) }
+    check()
     window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('scroll', onScroll) }
+  }, [pathname])
 
   useEffect(() => setMenuOpen(false), [pathname])
 
@@ -120,7 +134,7 @@ export default function Navbar() {
       // sub-pages that belong to a section
       if (to === '/game-center#game-hall' && pathname === '/game-center/hall') return true
       if (to.endsWith('#filiallar') && pathname.startsWith(to.split('#')[0] + '/filiallar/')) return true
-      if (to === '/dining#menyu' && pathname === '/dining/menu') return true
+      if (to === '/dining#menyu' && pathname.startsWith('/dining/menu')) return true
       return false
     }
     // the world link (Game Center / Dining & Lounge) stays active on its page until a section takes over
@@ -144,7 +158,7 @@ export default function Navbar() {
   }, [activeTo, lang, mode])
 
   return (
-    <header className={`nav ${scrolled ? 'is-scrolled' : ''} ${menuOpen ? 'is-menu-open' : ''}`} data-mode={mode}>
+    <header className={`nav ${scrolled ? 'is-scrolled' : ''} ${hidden && !menuOpen ? 'is-hidden' : ''} ${menuOpen ? 'is-menu-open' : ''}`} data-mode={mode}>
       <a href="/" className="nav__brand" onClick={(e) => { e.preventDefault(); nav('/') }} aria-label={t('nav.home')}>
         {mode === 'home' ? (
           <>
